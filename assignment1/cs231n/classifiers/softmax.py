@@ -30,7 +30,13 @@ def softmax_loss_naive(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  for i in range(X.shape[0]):
+    value = X[i].dot(W) # if not a matrix an array
+    value -= np.max(value) # Use this to avoid numerical problems, makes the highest value in 'value' a zero
+    loss += -np.log( np.exp(value[y[i]]) / np.sum(value) )
+    dW = 
+
+  loss += reg * np.sum(W * W)
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
