@@ -36,12 +36,14 @@ def softmax_loss_naive(W, X, y, reg):
 
     probs = np.exp(value) / np.sum(np.exp(value))
 
-    loss += -np.log(probs)
+    loss += -np.log(probs[y[i]])
+    dW += np.outer(X[i], probs - probs[y[i]])
 
-    dW = (probs - probs[y[i]]).dot(X[i]) 
+  loss /= X.shape[0]
+  dW /= X.shape[0]
 
   loss += reg * np.sum(W * W)
-  dW += reg * 2 * np.sum(W)
+  dW += reg * 2 * (W)
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
