@@ -33,10 +33,15 @@ def softmax_loss_naive(W, X, y, reg):
   for i in range(X.shape[0]):
     value = X[i].dot(W) # if not a matrix an array
     value -= np.max(value) # Use this to avoid numerical problems, makes the highest value in 'value' a zero
-    loss += -np.log( np.exp(value[y[i]]) / np.sum(value) )
-    dW = 
+
+    probs = np.exp(value) / np.sum(np.exp(value))
+
+    loss += -np.log(probs)
+
+    dW = (probs - probs[y[i]]).dot(X[i]) 
 
   loss += reg * np.sum(W * W)
+  dW += reg * 2 * np.sum(W)
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
@@ -60,7 +65,13 @@ def softmax_loss_vectorized(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  value = X.dow(W)
+  value -= np.max(value, axis=1)
+
+  probs = np.exp(value) / np.sum(np.exp(value), axis=1)
+
+  loss = np.sum(-np.log(probs), axis=0)
+  dW = X.T.dot(probs - probs[y]) / num_train + reg * 2 * W
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
