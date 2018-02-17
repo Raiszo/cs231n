@@ -76,8 +76,17 @@ class TwoLayerNet(object):
     # Store the result in the scores variable, which should be an array of      #
     # shape (N, C).                                                             #
     #############################################################################
-    l1 = X.dot(W1)
-    l1b = np.sum(l1b, axis=1)
+    def softmax(x):
+      x -= np.max(x, axis=1, keepdims=True)
+      return np.exp(x) / np.sum(np.exp(x), axis=1, keepdims=True)
+    def relu(x):
+      return np.maximum(0,x)
+    
+      
+    l1 = relu(np.dot(X, W1) + b1)
+    l2 = (np.dot(l1,W2) + b2)
+
+    scores = l2
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -94,7 +103,11 @@ class TwoLayerNet(object):
     # in the variable loss, which should be a scalar. Use the Softmax           #
     # classifier loss.                                                          #
     #############################################################################
-    pass
+    probs = softmax(l2)
+    # The first term is the same as the softmax LOSS, the reg term is for both of
+    # the weight matrizes
+    loss = np.sum(-np.log(probs[xrange(N),y])) / N + reg * np.sum(W2 * W2) + reg * np.sum(W1 * W1)
+    
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
