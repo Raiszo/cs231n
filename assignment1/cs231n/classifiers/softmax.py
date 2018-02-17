@@ -37,7 +37,9 @@ def softmax_loss_naive(W, X, y, reg):
     probs = np.exp(value) / np.sum(np.exp(value))
 
     loss += -np.log(probs[y[i]])
-    dW += np.outer(X[i], probs - probs[y[i]])
+    mask = np.zeros_like(probs)
+    mask[y[i]] = 1
+    dW += np.outer(X[i], probs - mask)
 
   loss /= X.shape[0]
   dW /= X.shape[0]
@@ -67,13 +69,18 @@ def softmax_loss_vectorized(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  value = X.dow(W)
-  value -= np.max(value, axis=1)
+  num_train = X.shape[0]
+  
+  value = X.dot(W)
+  value -= np.max(value, axis=1, keepdims=True)
 
-  probs = np.exp(value) / np.sum(np.exp(value), axis=1)
+  probs = np.exp(value) / np.sum(np.exp(value), axis=1, keepdims=True)
 
-  loss = np.sum(-np.log(probs), axis=0)
-  dW = X.T.dot(probs - probs[y]) / num_train + reg * 2 * W
+  loss = np.sum(-np.log(probs[xrange(num_train),y])) / num_train + reg * np.sum(W * W)
+  
+  mask = np.zeros_like(probs)
+  mask[xrange(num_train),y] = 1
+  dW = X.T.dot(probs - mask) / num_train + reg * 2 * W
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
