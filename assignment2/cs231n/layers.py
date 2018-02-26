@@ -25,11 +25,15 @@ def affine_forward(x, w, b):
     # TODO: Implement the affine forward pass. Store the result in out. You   #
     # will need to reshape the input into rows.                               #
     ###########################################################################
-    pass
+    D = np.prod(x.shape[1:]) # d_1 * ... * d_k
+    N = x.shape[0] # number of samples "N"
+    xr = x.reshape(( N, D )) # reshaped as (N, D)
+
+    out = xr.dot(w) + b
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
-    cache = (x, w, b)
+    cache = (x, w, b) # return x, not xr
     return out, cache
 
 
@@ -53,7 +57,16 @@ def affine_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the affine backward pass.                               #
     ###########################################################################
-    pass
+    D = np.prod(x.shape[1:])
+    N = x.shape[0]
+    xr = x.reshape(( N, D ))
+
+    dw = xr.T.dot(dout)
+
+    dxr = dout.dot(w.T)
+    dx = dxr.reshape(x.shape) # do not forget the dimensions (N, d1, ..., d_k)
+
+    db = np.sum(dout, axis=0)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -75,7 +88,7 @@ def relu_forward(x):
     ###########################################################################
     # TODO: Implement the ReLU forward pass.                                  #
     ###########################################################################
-    pass
+    out = np.maximum(0,x) # quite simple :D
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -98,7 +111,7 @@ def relu_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the ReLU backward pass.                                 #
     ###########################################################################
-    pass
+    dx = (x > 0) * dout # only valus x > 0 recieve a gradiente :3
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -507,6 +520,7 @@ def spatial_batchnorm_backward(dout, cache):
 
 
 def svm_loss(x, y):
+    # x is x.dot(w) already
     """
     Computes the loss and gradient using for multiclass SVM classification.
 
@@ -547,12 +561,13 @@ def softmax_loss(x, y):
     - loss: Scalar giving the loss
     - dx: Gradient of the loss with respect to x
     """
-    shifted_logits = x - np.max(x, axis=1, keepdims=True)
+    # x is x.dot(w) already
+    shifted_logits = x - np.max(x, axis=1, keepdims=True) # can do the shitfint first O:
     Z = np.sum(np.exp(shifted_logits), axis=1, keepdims=True)
     log_probs = shifted_logits - np.log(Z)
     probs = np.exp(log_probs)
     N = x.shape[0]
-    loss = -np.sum(log_probs[np.arange(N), y]) / N
+    loss = -np.sum(log_probs[np.arange(N), y]) / N # can do the log before
     dx = probs.copy()
     dx[np.arange(N), y] -= 1
     dx /= N

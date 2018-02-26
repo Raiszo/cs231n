@@ -1,5 +1,6 @@
 from builtins import range
 from builtins import object
+from functools import reduce
 import numpy as np
 
 from cs231n.layers import *
@@ -47,7 +48,10 @@ class TwoLayerNet(object):
         # weights and biases using the keys 'W1' and 'b1' and second layer weights #
         # and biases using the keys 'W2' and 'b2'.                                 #
         ############################################################################
-        pass
+        self.params['W1'] = weight_scale * np.random.randn(input_dim, hidden_dim)
+        self.params['W2'] = weight_scale * np.random.randn(hidden_dim, num_classes)
+        self.params['b1'] = np.zeros(hidden_dim)
+        self.params['b2'] = np.zeros(num_classes)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -77,7 +81,12 @@ class TwoLayerNet(object):
         # TODO: Implement the forward pass for the two-layer net, computing the    #
         # class scores for X and storing them in the scores variable.              #
         ############################################################################
-        pass
+        score1, cache1_s = affine_forward(X,self.params['W1'], self.params['b1'])
+        act1, cache1_a = relu_forward(score1)
+
+        score2, cache2_s = affine_forward(act1,self.params['W2'], self.params['b2'])
+
+        scores = score2
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -97,7 +106,20 @@ class TwoLayerNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
-        pass
+        W2 = self.params['W2']
+        W1 = self.params['W1']
+
+        loss, dscore2 = softmax_loss(score2, y)
+        loss += 0.5 * self.reg * (np.sum(W2 * W2) + np.sum(W1 * W1))
+
+        dact1, dW2, db2 = affine_backward(dscore2, cache2_s)
+        dscores2 = relu_backward(dact1, cache1_a)
+        dx, dW1, db1 = affine_backward(dscores2, cache1_s)
+
+        grads['W2'] = dW2 + self.reg * W2
+        grads['W1'] = dW1 + self.reg * W1
+        grads['b2'] = db2
+        grads['b1'] = db1
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -163,7 +185,14 @@ class FullyConnectedNet(object):
         # beta2, etc. Scale parameters should be initialized to one and shift      #
         # parameters should be initialized to zero.                                #
         ############################################################################
-        pass
+        total_dims = [num_classes] + hidden_dims # add the first one for convinience
+        last_dim = input_dim
+        for ind,dim in enumerate(total_dims):
+            i = str(ind)
+            self.params['W' + i] = weight_scale * np.random.randn(last_dim, dim)
+            self.params['b' + i] = np.zeros(dim)
+
+        
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -221,7 +250,19 @@ class FullyConnectedNet(object):
         # self.bn_params[1] to the forward pass for the second batch normalization #
         # layer, etc.                                                              #
         ############################################################################
-        pass
+        results = {}
+        
+        for ind in range(self.num_layers):
+            i = str(ind)
+            score, cache_s = affine_forward(X,self.params['W'+i], self.params['b'+i])
+            results['score' + i] = score
+            results['cache_s' + i] = cache_s
+            if (not i == self.num_layers-1): # do not compute relu activation for the last layer
+                act, cache_a = relu_forward(score)
+                results['act' + i] = act
+                results['cache_a' + i] = cache_a
+
+        scores = results['score'+ str(self.num_layers - 1)]
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -244,7 +285,29 @@ class FullyConnectedNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
-        pass
+        W2 = self.params['W2']
+        W1 = self.params['W1']
+
+        loss, dscores = softmax_loss(scores, y)
+        wSum = 0
+        for ind in range(self.num_layers): # should use a reduce, but do it's not as pretty as JS reduce
+            i = str(ind)
+            wSum += np.sum(self.params['W' + i] * self.params['W' + i])
+        loss += 0.5 * self.reg * wSum
+
+        num = str(self.num_layers-1)
+        dout, dW, db = affine_backward(dscores, results['cache_s' + str(num)])
+        
+        grads['W'+num] = dW + self.reg * self.params['W'+num]
+        grads['b'+num] = db
+        
+        for ind in range(self.num_layers,0):
+            i = str(ind)
+            dscores = relu_backward(dout, results['cache_a'+i])
+            dout, dW, db = affine_backward(results[dscores], results['cache_s'+i])
+
+            grads['W'+i] = dW + self.reg * self.params['W'+i]
+            grads['b'+i] = db
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
