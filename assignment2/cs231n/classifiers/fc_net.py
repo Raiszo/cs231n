@@ -185,13 +185,17 @@ class FullyConnectedNet(object):
         # beta2, etc. Scale parameters should be initialized to one and shift      #
         # parameters should be initialized to zero.                                #
         ############################################################################
-        total_dims = [num_classes] + hidden_dims # add the first one for convinience
+        total_dims = hidden_dims + [num_classes] # add the first one for convinience
         last_dim = input_dim
         for ind,dim in enumerate(total_dims):
             i = str(ind)
             self.params['W' + i] = weight_scale * np.random.randn(last_dim, dim)
             self.params['b' + i] = np.zeros(dim)
+            last_dim = dim;
 
+        # Use this to validate the parameter's shape
+        # for i in sorted(self.params):
+        #     print(i, self.params[i].shape)
         
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -251,18 +255,26 @@ class FullyConnectedNet(object):
         # layer, etc.                                                              #
         ############################################################################
         results = {}
-        
-        for ind in range(self.num_layers):
+
+        act = X # act is the variable passed between (affine + relu) layers
+        for ind in range(self.num_layers-1): # loop over layers, expcept the last one
             i = str(ind)
-            score, cache_s = affine_forward(X,self.params['W'+i], self.params['b'+i])
+            score, cache_s = affine_forward(act,self.params['W'+i], self.params['b'+i])
             results['score' + i] = score
             results['cache_s' + i] = cache_s
-            if (not i == self.num_layers-1): # do not compute relu activation for the last layer
-                act, cache_a = relu_forward(score)
-                results['act' + i] = act
-                results['cache_a' + i] = cache_a
+            act, cache_a = relu_forward(score)
+            results['act' + i] = act
+            results['cache_a' + i] = cache_a
 
-        scores = results['score'+ str(self.num_layers - 1)]
+        # Handle the last layer here, coz it doesn't use a relu function but something else
+        last = str(self.num_layers-1)
+        # use the last score
+        score, cache_s = affine_forward(act,self.params['W'+last], self.params['b'+last])
+        results['score' + last] = score
+        results['cache_s' + last] = cache_s
+
+
+        scores = results['score'+ last]
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -289,25 +301,28 @@ class FullyConnectedNet(object):
         W1 = self.params['W1']
 
         loss, dscores = softmax_loss(scores, y)
+
         wSum = 0
         for ind in range(self.num_layers): # should use a reduce, but do it's not as pretty as JS reduce
             i = str(ind)
             wSum += np.sum(self.params['W' + i] * self.params['W' + i])
+        
         loss += 0.5 * self.reg * wSum
 
-        num = str(self.num_layers-1)
-        dout, dW, db = affine_backward(dscores, results['cache_s' + str(num)])
+        # reuse the last variable
+        dout, dW, db = affine_backward(dscores, results['cache_s' + last])
         
-        grads['W'+num] = dW + self.reg * self.params['W'+num]
-        grads['b'+num] = db
-        
-        for ind in range(self.num_layers,0):
+        grads['W'+last] = dW + self.reg * self.params['W'+last]
+        grads['b'+last] = db
+
+        for ind in reversed(range(self.num_layers-1)):
             i = str(ind)
             dscores = relu_backward(dout, results['cache_a'+i])
-            dout, dW, db = affine_backward(results[dscores], results['cache_s'+i])
+            dout, dW, db = affine_backward(dscores, results['cache_s'+i])
 
             grads['W'+i] = dW + self.reg * self.params['W'+i]
             grads['b'+i] = db
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
