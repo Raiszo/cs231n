@@ -182,24 +182,40 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # variables.                                                          #
         #######################################################################
         # do some statistics
-        mini_mean = x.mean(axis=0)
-        mini_var = x.var(axis=0)
+        # mini_mean = x.mean(axis=0)
+        # mini_var = x.var(axis=0)
 
         # store this, dunno why yet
-        running_mean = momentum * running_mean + (1 - momentum) * mini_mean
-        running_var = momentum * running_var + (1 - momentum) * mini_var
+        # running_mean = momentum * running_mean + (1 - momentum) * mini_mean
+        # running_var = momentum * running_var + (1 - momentum) * mini_var
 
         # normalize and then shift to a desire mean and variance,
         # think of this to move the variance and mean to a desired value for
         # some reason I dunn
-        x_norm = (x - mini_mean) / np.sqrt(mini_var + eps)
+        # x_norm = (x - mini_mean) / np.sqrt(mini_var + eps)
+        # out = gamma * x_norm + beta
+
+        # start with x
+        mean = x.mean(axis = 0)
+        x_zero_mean = x - mean
+
+        var = x.var(axis = 0)
+        var_sqrt = np.sqrt(var + eps)
+        var_inv = 1 / var_sqrt
+        x_norm = x_zero_mean  * var_inv
+
+        running_mean = momentum * running_mean + (1 - momentum) * mean
+        running_var = momentum * running_var + (1 - momentum) * var
+        
         out = gamma * x_norm + beta
         cache = {
             'x': x,
+            'mean': mean,
+            'x_zero_mean': x_zero_mean,
+            'var': var,
+            'var_sqrt': var_sqrt,
+            'var_inv': var_inv,
             'x_norm': x_norm,
-            'mean': mini_mean,
-            'var': mini_var,
-            'sqrt_var': np.sqrt(mini_var + eps),
             'beta': beta,
             'gamma': gamma,
             'eps': eps
@@ -252,18 +268,46 @@ def batchnorm_backward(dout, cache):
     # TODO: Implement the backward pass for batch normalization. Store the    #
     # results in the dx, dgamma, and dbeta variables.                         #
     ###########################################################################
+    
     beta = cache['beta']
     gamma = cache['gamma']
 
     x = cache['x']
-    x_norm = cache['x_norm']
     mean = cache['mean']
+    x_zero_mean = cache['x_zero_mean']
     var = cache['var']
+    var_sqrt = cache['var_sqrt']
+    var_inv = cache['var_inv']
+    x_norm = cache['x_norm']
     eps = cache['eps']
 
-    dx_var = gamma * dout
-    dx_mean = dx_var * (- 1 / (var + eps)) * 
-    # dx_mean = gamma * (- 1 / (var + eps)) * x * dout +
+    N = x.shape[0]
+
+    
+    dx_norm = gamma * dout
+    
+    dx_zero_mean1 = var_inv * dx_norm
+    
+    # Dunno why, similar to b
+    # It's because there is a substraction accross features (columns)
+    # one does not see it coz of broadcasting
+    dvar_inv = np.sum(x_zero_mean * dx_norm, axis=0)
+    dvar_sqrt = -1 / (var_sqrt ** 2) * dvar_inv
+    dvar = 0.5 / np.sqrt(var + eps) * dvar_sqrt
+    # dvar = -0.5 * np.power(var + eps, -1.5) * dvar_sqrt
+    
+    dx_zero_mean2 = (2 * x_zero_mean) * np.ones_like(x) * (1/N) * dvar
+
+    
+    dx_zero_mean = dx_zero_mean1 + dx_zero_mean2
+
+
+    # This is a summation node
+    dx1 = dx_zero_mean
+    dmean = - np.sum(dx_zero_mean, axis = 0)
+    dx2 = 1/N * np.ones_like(x) * dmean
+
+    dx = dx1 + dx2
     dgamma = np.sum(x_norm * dout, axis=0)
     dbeta = np.sum(dout, axis=0)
     ###########################################################################
