@@ -191,6 +191,8 @@ class FullyConnectedNet(object):
             i = str(ind)
             self.params['W' + i] = weight_scale * np.random.randn(last_dim, dim)
             self.params['b' + i] = np.zeros(dim)
+            self.params['gamma' + i] = np.ones(dim)
+            self.params['beta' + i] = np.zeros(dim)
             last_dim = dim;
 
         # Use this to validate the parameter's shape
@@ -262,7 +264,12 @@ class FullyConnectedNet(object):
             score, cache_s = affine_forward(act,self.params['W'+i], self.params['b'+i])
             results['score' + i] = score
             results['cache_s' + i] = cache_s
-            act, cache_a = relu_forward(score)
+
+            norm, cache_n = batchnorm_forward(score,self.params['gamma'+i], self.params['beta'+i], self.bn_params[ind])
+            results['norm' + i] = norm
+            results['cache_n' + i] = cache_n
+            
+            act, cache_a = relu_forward(norm)
             results['act' + i] = act
             results['cache_a' + i] = cache_a
 
@@ -314,14 +321,19 @@ class FullyConnectedNet(object):
         
         grads['W'+last] = dW + self.reg * self.params['W'+last]
         grads['b'+last] = db
+        grads['gamma'+last] = 0
+        grads['beta'+last] = 0
 
         for ind in reversed(range(self.num_layers-1)):
             i = str(ind)
             dscores = relu_backward(dout, results['cache_a'+i])
-            dout, dW, db = affine_backward(dscores, results['cache_s'+i])
+            dnorm, dgamma, dbeta = batchnorm_backward(dscores, results['cache_n'+i])
+            dout, dW, db = affine_backward(dnorm, results['cache_s'+i])
 
             grads['W'+i] = dW + self.reg * self.params['W'+i]
             grads['b'+i] = db
+            grads['gamma'+i] = dgamma
+            grads['beta'+i] = dbeta
 
         ############################################################################
         #                             END OF YOUR CODE                             #
