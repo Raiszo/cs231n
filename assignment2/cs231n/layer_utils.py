@@ -45,11 +45,11 @@ def affine_batch_relu_forward(x,w,b,gamma,beta,params):
     - out: Output from the ReLU
     - cache: Object to give to the backward pass
     """
-    score, cache_s = affine_forward(x,w,b)
-    norm, cache_n = batchnorm_forward(score,gamma,beta,params)
-    out, cache_a = relu_forward(norm)
+    score, fc_cache = affine_forward(x,w,b)
+    norm, batch_cache = batchnorm_forward(score,gamma,beta,params)
+    out, relu_cache = relu_forward(norm)
 
-    cache = (cache_s, cache_n, cache_a)
+    cache = (fc_cache, batch_cache, relu_cache)
     return out, cache
 
 
@@ -57,11 +57,11 @@ def affine_batch_relu_backward(dout, cache):
     """
     Backward pass for the affine-batch_norm-relu convenience layer
     """
-    cache_a, cache_n, cache_s = cache
+    fc_cache, batch_cache, relu_cache = cache
     
-    dscores = relu_backward(dout, cache_a)
-    dnorm, dgamma, dbeta = batchnorm_backward(dscores,cache_n)
-    dx, dw, db = affine_backward(dnorm,cache_s)
+    dscores = relu_backward(dout, relu_cache)
+    dnorm, dgamma, dbeta = batchnorm_backward(dscores, batch_cache)
+    dx, dw, db = affine_backward(dnorm, fc_cache)
 
     return dx, dw, db, dgamma, dbeta
 

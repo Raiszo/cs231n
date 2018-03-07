@@ -191,8 +191,10 @@ class FullyConnectedNet(object):
             i = str(ind)
             self.params['W' + i] = weight_scale * np.random.randn(last_dim, dim)
             self.params['b' + i] = np.zeros(dim)
-            self.params['gamma' + i] = np.ones(dim)
-            self.params['beta' + i] = np.zeros(dim)
+            if (self.use_batchnorm):
+                self.params['gamma' + i] = np.ones(dim)
+                self.params['beta' + i] = np.zeros(dim)
+            
             last_dim = dim;
 
         # Use this to validate the parameter's shape
@@ -263,21 +265,24 @@ class FullyConnectedNet(object):
             i = str(ind)
             w = self.params['W'+i]
             b = self.params['b'+i]
-            gamma = self.params['gamma'+i]
-            beta = self.params['beta'+i]
-            
-            params = self.bn_params[ind] # this shit carries the running mean and var
-            
-            act, cache = affine_batch_relu_forward(act,w,b,gamma,beta, params)
-
-
-
-            cache_s, cache_n, cache_a = cache
-
-            results['cache_s' + i] = cache_s
-            results['cache_n' + i] = cache_n
-            results['cache_a' + i] = cache_a
-
+            if (self.use_batchnorm):
+                gamma = self.params['gamma'+i]
+                beta = self.params['beta'+i]
+                params = self.bn_params[ind] # this shit carries the running mean and var
+                
+                act, cache = affine_batch_relu_forward(act,w,b,gamma,beta, params)
+                cache_s, cache_n, cache_a = cache
+                
+                results['cache_s' + i] = cache_s
+                results['cache_n' + i] = cache_n
+                results['cache_a' + i] = cache_a
+            else:
+                act, cache = affine_relu_forward(act,w,b,gamma,beta, params)
+                cache_s, cache_a = cache
+                
+                results['cache_s' + i] = cache_s
+                results['cache_a' + i] = cache_a
+                
         # Handle the last layer here, coz it doesn't use a relu function but something else
         last = str(self.num_layers-1)
         # use the last score
@@ -323,19 +328,27 @@ class FullyConnectedNet(object):
         
         grads['W'+last] = dW + self.reg * self.params['W'+last]
         grads['b'+last] = db
-        grads['gamma'+last] = 0
-        grads['beta'+last] = 0
+        
+        if (self.use_batchnorm):
+            grads['gamma'+last] = 0
+            grads['beta'+last] = 0
 
         for ind in reversed(range(self.num_layers-1)):
             i = str(ind)
-            cache = results['cache_a'+i], results['cache_n'+i], results['cache_s'+i], 
-            dout, dW, db, dgamma, dbeta = affine_batch_relu_backward(dout, cache)
+            if (self.use_batchnorm):
+                cache = results['cache_s'+i], results['cache_n'+i], results['cache_a'+i],
+                dout, dW, db, dgamma, dbeta = affine_batch_relu_backward(dout, cache)
 
-            grads['W'+i] = dW + self.reg * self.params['W'+i]
-            grads['b'+i] = db
-            grads['gamma'+i] = dgamma
-            grads['beta'+i] = dbeta
+                grads['W'+i] = dW + self.reg * self.params['W'+i]
+                grads['b'+i] = db
+                grads['gamma'+i] = dgamma
+                grads['beta'+i] = dbeta
+            else:
+                cache = results['cache_s'+i], results['cache_a'+i],
+                dout, dW, db = affine_relu_backward(dout, cache)
 
+                grads['W'+i] = dW + self.reg * self.params['W'+i]
+                grads['b'+i] = db
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################

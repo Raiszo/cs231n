@@ -111,7 +111,9 @@ def relu_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the ReLU backward pass.                                 #
     ###########################################################################
-    dx = (x > 0) * dout # only valus x > 0 recieve a gradient :3
+    print(x.mean())
+    print(dout.mean())
+    dx = (x >= 0) * dout # only valus x > 0 recieve a gradient :3
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
