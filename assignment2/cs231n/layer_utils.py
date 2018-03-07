@@ -30,6 +30,38 @@ def affine_relu_backward(dout, cache):
     dx, dw, db = affine_backward(da, fc_cache)
     return dx, dw, db
 
+def affine_batch_relu_forward(x,w,b,gamma,beta,params):
+    """
+    Convenience layer that performs an affine transform followed by 
+    batch normalizaion mayer and a ReLU
+
+    Inputs:
+    - x: Input to the affine layer
+    - w, b: Weights for the affine layer
+    - gamma, beta: scale and shift parameters for batch normalization
+
+    Returns a tuple of:
+    - out: Output from the ReLU
+    - cache: Object to give to the backward pass
+    """
+    score, cache_s = affine_forward(x,w,b)
+    norm, cache_n = batchnorm_forward(score,gamma,beta,params)
+    out, cache_a = relu_forward(norm)
+
+    cache = (cache_s, cache_n, cache_a)
+    return out, cache
+
+def affine_batch_relu_backward(dout, cache):
+    """
+    Backward pass for the affine-batch_norm-relu convenience layer
+    """
+    cache_a, cache_n, cache_s = cache
+    
+    dscores = relu_backward(dout, cache_a)
+    dnorm, dgamma, dbeta = batchnorm_backward(dscores,cache_n)
+    dx, dw, db = affine_backward(dnorm,cache_s)
+
+    return dx, dw, db, dgamma, dbeta
 
 def conv_relu_forward(x, w, b, conv_param):
     """

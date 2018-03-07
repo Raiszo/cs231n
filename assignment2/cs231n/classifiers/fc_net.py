@@ -261,27 +261,30 @@ class FullyConnectedNet(object):
         act = X # act is the variable passed between (affine + relu) layers
         for ind in range(self.num_layers-1): # loop over layers, expcept the last one
             i = str(ind)
-            score, cache_s = affine_forward(act,self.params['W'+i], self.params['b'+i])
-            results['score' + i] = score
-            results['cache_s' + i] = cache_s
-
-            norm, cache_n = batchnorm_forward(score,self.params['gamma'+i], self.params['beta'+i], self.bn_params[ind])
-            results['norm' + i] = norm
-            results['cache_n' + i] = cache_n
+            w = self.params['W'+i]
+            b = self.params['b'+i]
+            gamma = self.params['gamma'+i]
+            beta = self.params['beta'+i]
             
-            act, cache_a = relu_forward(norm)
-            results['act' + i] = act
+            params = self.bn_params[ind] # this shit carries the running mean and var
+            
+            act, cache = affine_batch_relu_forward(act,w,b,gamma,beta, params)
+
+
+
+            cache_s, cache_n, cache_a = cache
+
+            results['cache_s' + i] = cache_s
+            results['cache_n' + i] = cache_n
             results['cache_a' + i] = cache_a
 
         # Handle the last layer here, coz it doesn't use a relu function but something else
         last = str(self.num_layers-1)
         # use the last score
-        score, cache_s = affine_forward(act,self.params['W'+last], self.params['b'+last])
-        results['score' + last] = score
+        scores, cache_s = affine_forward(act,self.params['W'+last], self.params['b'+last])
         results['cache_s' + last] = cache_s
 
 
-        scores = results['score'+ last]
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -304,8 +307,6 @@ class FullyConnectedNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
-        W2 = self.params['W2']
-        W1 = self.params['W1']
 
         loss, dscores = softmax_loss(scores, y)
 
@@ -316,6 +317,7 @@ class FullyConnectedNet(object):
         
         loss += 0.5 * self.reg * wSum
 
+        
         # reuse the last variable
         dout, dW, db = affine_backward(dscores, results['cache_s' + last])
         
@@ -326,9 +328,8 @@ class FullyConnectedNet(object):
 
         for ind in reversed(range(self.num_layers-1)):
             i = str(ind)
-            dscores = relu_backward(dout, results['cache_a'+i])
-            dnorm, dgamma, dbeta = batchnorm_backward(dscores, results['cache_n'+i])
-            dout, dW, db = affine_backward(dnorm, results['cache_s'+i])
+            cache = results['cache_a'+i], results['cache_n'+i], results['cache_s'+i], 
+            dout, dW, db, dgamma, dbeta = affine_batch_relu_backward(dout, cache)
 
             grads['W'+i] = dW + self.reg * self.params['W'+i]
             grads['b'+i] = db
