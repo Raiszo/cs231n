@@ -111,8 +111,8 @@ def relu_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the ReLU backward pass.                                 #
     ###########################################################################
-    print(x.mean())
-    print(dout.mean())
+    # print(x.mean())
+    # print(dout.mean())
     dx = (x >= 0) * dout # only valus x > 0 recieve a gradient :3
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -294,7 +294,7 @@ def batchnorm_backward(dout, cache):
     # It's because there is a substraction accross features (columns)
     # one does not see it coz of broadcasting
     dvar_inv = np.sum(x_zero_mean * dx_norm, axis=0)
-    dvar_sqrt = -1 / (var_sqrt ** 2) * dvar_inv
+    dvar_sqrt = -1 / (var_sqrt ** 2 + eps) * dvar_inv
     dvar = 0.5 / np.sqrt(var + eps) * dvar_sqrt
     
     dx_zero_mean2 = (2 * x_zero_mean) * np.ones_like(x) * (1/N) * dvar

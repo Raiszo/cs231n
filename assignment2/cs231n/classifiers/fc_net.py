@@ -277,7 +277,7 @@ class FullyConnectedNet(object):
                 results['cache_n' + i] = cache_n
                 results['cache_a' + i] = cache_a
             else:
-                act, cache = affine_relu_forward(act,w,b,gamma,beta, params)
+                act, cache = affine_relu_forward(act,w,b)
                 cache_s, cache_a = cache
                 
                 results['cache_s' + i] = cache_s
@@ -335,6 +335,7 @@ class FullyConnectedNet(object):
 
         for ind in reversed(range(self.num_layers-1)):
             i = str(ind)
+            # print(ind)
             if (self.use_batchnorm):
                 cache = results['cache_s'+i], results['cache_n'+i], results['cache_a'+i],
                 dout, dW, db, dgamma, dbeta = affine_batch_relu_backward(dout, cache)
