@@ -40,6 +40,7 @@ def affine_batch_relu_forward(x,w,b,gamma,beta,params):
     - x: Input to the affine layer
     - w, b: Weights for the affine layer
     - gamma, beta: scale and shift parameters for batch normalization
+    - bn_parms: params for batch_normalization like momentum, running mean and var
 
     Returns a tuple of:
     - out: Output from the ReLU
@@ -64,6 +65,80 @@ def affine_batch_relu_backward(dout, cache):
     dx, dw, db = affine_backward(dnorm, fc_cache)
 
     return dx, dw, db, dgamma, dbeta
+
+
+def affine_batch_relu_dropout_forward(x,w,b,gamma,beta,bn_params,drop_params):
+    """
+    Convenience layer that performs an affine transform followed by 
+    batch normalizaion, ReLU and a dropout layer
+
+    Inputs:
+    - x: Input to the affine layer
+    - w, b: Weights for the affine layer
+    - gamma, beta: scale and shift parameters for batch normalization
+    - bn_parms: params for batch_normalization like momentum, running mean and var
+    - drop_params: params for dropout like p, mode and seed
+
+    Returns a tuple of:
+    - out: Output from the dropout layer
+    - cache: Object to give to the backward pass
+    """
+    score, fc_cache = affine_forward(x,w,b)
+    norm, bn_cache = batchnorm_forward(score,gamma,beta,bn_params)
+    act, relu_cache = relu_forward(norm)
+    out, drop_cache = dropout_forward(act,drop_params)
+
+    cache = (fc_cache, bn_cache, relu_cache, drop_cache)
+    return out, cache
+
+
+def affine_batch_relu_dropout_backward(dout, cache):
+    """
+    Backward pass for the affine-batch_norm-relu convenience layer
+    """
+    fc_cache, bn_cache, relu_cache, drop_cache = cache
+
+    ddrop = dropout_backward(dout, drop_cache)
+    dscores = relu_backward(ddrop, relu_cache)
+    dnorm, dgamma, dbeta = batchnorm_backward(dscores, bn_cache)
+    dx, dw, db = affine_backward(dnorm, fc_cache)
+
+    return dx, dw, db, dgamma, dbeta
+
+
+def affine_relu_dropout_forward(x,w,b,drop_params):
+    """
+    Convenience layer that performs an affine transform followed by 
+    batch normalizaion, ReLU and a dropout layer
+
+    Inputs:
+    - x: Input to the affine layer
+    - w, b: Weights for the affine layer
+    - drop_params: params for dropout like p, mode and seed
+
+    Returns a tuple of:
+    - out: Output from the dropout layer
+    - cache: Object to give to the backward pass
+    """
+    score, fc_cache = affine_forward(x,w,b)
+    act, relu_cache = relu_forward(score)
+    out, drop_cache = dropout_forward(act,drop_params)
+
+    cache = (fc_cache, relu_cache, drop_cache)
+    return out, cache
+
+
+def affine_relu_dropout_backward(dout, cache):
+    """
+    Backward pass for the affine-batch_norm-relu convenience layer
+    """
+    fc_cache, relu_cache, drop_cache = cache
+
+    dact = dropout_backward(dout, drop_cache)
+    dscores = relu_backward(dact, relu_cache)
+    dx, dw, db = affine_backward(dscores, fc_cache)
+
+    return dx, dw, db
 
 
 def conv_relu_forward(x, w, b, conv_param):

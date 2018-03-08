@@ -269,17 +269,29 @@ class FullyConnectedNet(object):
                 gamma = self.params['gamma'+i]
                 beta = self.params['beta'+i]
                 params = self.bn_params[ind] # this shit carries the running mean and var
-                
-                act, cache = affine_batch_relu_forward(act,w,b,gamma,beta, params)
-                cache_s, cache_n, cache_a = cache
-                
+
+                if (self.use_dropout):
+                    act, cache = affine_batch_relu_dropout_forward(act,w,b,gamma,beta,params,self.dropout_param)
+                    cache_s, cache_n, cache_a, cache_d = cache
+
+                    results['cache_d' + i] = cache_d
+                else:
+                    act, cache = affine_batch_relu_forward(act,w,b,gamma,beta, params)
+                    cache_s, cache_n, cache_a = cache
+
                 results['cache_s' + i] = cache_s
                 results['cache_n' + i] = cache_n
                 results['cache_a' + i] = cache_a
             else:
-                act, cache = affine_relu_forward(act,w,b)
-                cache_s, cache_a = cache
-                
+                if (self.use_dropout):
+                    act, cache = affine_relu_dropout_forward(act,w,b,self.dropout_param)
+                    cache_s, cache_a, cache_d = cache
+
+                    results['cache_d' + i] = cache_d
+                else:
+                    act, cache = affine_relu_forward(act,w,b)
+                    cache_s, cache_a = cache
+
                 results['cache_s' + i] = cache_s
                 results['cache_a' + i] = cache_a
                 
@@ -337,16 +349,26 @@ class FullyConnectedNet(object):
             i = str(ind)
             # print(ind)
             if (self.use_batchnorm):
-                cache = results['cache_s'+i], results['cache_n'+i], results['cache_a'+i],
-                dout, dW, db, dgamma, dbeta = affine_batch_relu_backward(dout, cache)
+                if (self.use_dropout):
+                    cache = results['cache_s'+i], results['cache_n'+i],results['cache_a'+i], results['cache_d'+i]
+                    dout, dW, db, dgamma, dbeta = affine_batch_relu_dropout_backward(dout, cache)
+                    
+                else:
+                    cache = results['cache_s'+i], results['cache_n'+i], results['cache_a'+i],
+                    dout, dW, db, dgamma, dbeta = affine_batch_relu_backward(dout, cache)
 
                 grads['W'+i] = dW + self.reg * self.params['W'+i]
                 grads['b'+i] = db
                 grads['gamma'+i] = dgamma
                 grads['beta'+i] = dbeta
             else:
-                cache = results['cache_s'+i], results['cache_a'+i],
-                dout, dW, db = affine_relu_backward(dout, cache)
+                if (self.use_dropout):
+                    cache = results['cache_s'+i],results['cache_a'+i], results['cache_d'+i]
+                    dout, dW, db = affine_relu_dropout_backward(dout, cache)
+                    
+                else:
+                    cache = results['cache_s'+i], results['cache_a'+i],
+                    dout, dW, db = affine_relu_backward(dout, cache)
 
                 grads['W'+i] = dW + self.reg * self.params['W'+i]
                 grads['b'+i] = db
