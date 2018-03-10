@@ -511,7 +511,54 @@ def conv_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
-    pass
+    (x, w, b, conv_param) = cache
+    padding	= conv_param['pad']
+    stride	= conv_param['stride']
+    
+    N,C,H,W	= x.shape
+    f,_,hh,ww	= w.shape
+
+    _,f,out_h,out_w = dout.shape
+    half_h = hh//2 - (1 if hh%2 == 0 else 0)
+    half_w = ww//2 - (1 if ww%2 == 0 else 0)
+
+    dw = np.zeros_like(w)
+    db = np.zeros_like(b)
+    dx = np.zeros_like(x)
+
+    w_summed = w.reshape(w.shape[0], np.prod(w.shape[1:])).sum(axis=1)
+    for m in range(N):
+        img = x[m]
+        # add padding
+        # first tuple is to not add padding accross the channels dim
+        padded = np.pad(img, ((0,0), (padding,padding), (padding,padding)), 'constant')
+        dpadded = np.zeros_like(padded)
+        for i in range(out_h):
+            for j in range(out_w):
+                dout_ij = dout[m,:,i,j] # shape f: number of filters
+                db += dout_ij # bias term updates directly
+
+                # Need to get the region of spational interest
+                current_h = (i*stride) if i>0 else 0
+                current_w = (j*stride) if j>0 else 0
+                # Once in a position, get a small window from the image
+                mask = padded[:,current_h:current_h+hh, current_w:current_w+ww]
+
+                # expand each result from each filter convolution by
+                # multiplying for a ONES matrix, the reshape is just a trick
+                dout_conv_row = dout_ij.reshape(f,1).dot(np.ones((1,C*hh*ww)))
+                dout_conv = dout_conv_row.reshape(f,C,hh,ww)
+
+                # Once dout is projected, update dw
+                dw += mask*dout_conv
+
+                dx_space = (w*dout_conv).sum(axis=0)
+                dpadded[:,current_h:current_h+hh, current_w:current_w+ww] += dx_space
+        # remember to cut off the padding
+        dx[m] = dpadded[:,1:-1,1:-1]
+                
+
+    
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
