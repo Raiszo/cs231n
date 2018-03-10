@@ -454,25 +454,39 @@ def conv_forward_naive(x, w, b, conv_param):
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
-    padding = conv_param['pad']
-    N,C,H,W = x.shape
-    _,_,hh,ww = w.shape
-    
-    for i in xrange(N):
-        img = x[i]
+    padding	= conv_param['pad']
+    stride	= conv_param['stride']
+    N,C,H,W	= x.shape
+    f,_,hh,ww	= w.shape
+
+
+    out_h = 1+(H + 2*padding - hh) // stride
+    out_w = 1+(W + 2*padding - ww) // stride
+    out = np.zeros((N,f, out_h, out_w))
+    half_h = hh//2 - (1 if hh%2 == 0 else 0)
+    half_w = ww//2 - (1 if ww%2 == 0 else 0)
+
+    # Go through all images
+    for m in range(N):
+        img = x[m]
+        # add padding
         # first tuple is to not add padding accross the channels dim
         padded = np.pad(img, ((0,0), (padding,padding), (padding,padding)), 'constant')
-        _, h_padded, w_padded = padded.shape
 
+        for i in range(out_h):
+            for j in range(out_w):
+                # start at zero, and move with stride
+                current_h = (i*stride) if i>0 else 0
+                current_w = (j*stride) if j>0 else 0
+                # Once in a position, get a small window from the image
+                mask = padded[:,current_h:current_h+hh, current_w:current_w+ww]
+
+                prod = mask * w
+                # Use this to sum elements across all dims, except for 0 (f)
+                conv = prod.reshape(prod.shape[0], np.prod(prod.shape[1:])).sum(axis=1)
+                out[m,:,i,j] = conv + b
         
-        points_h = np.arange(hh, h_padded, stride)
-        points_w = np.arange(ww, w_padded, stride)
-
-        for i_ in points_h:
-            for j_ in points_w:
-                i = int(i_)
-                j = int(j_)
-                
+        
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
