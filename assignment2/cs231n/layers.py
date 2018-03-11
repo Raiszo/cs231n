@@ -691,11 +691,64 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     # version of batch normalization defined above. Your implementation should#
     # be very short; ours is less than five lines.                            #
     ###########################################################################
-    pass
+    N,C,H,W = x.shape
+
+    mode = bn_param['mode']
+    eps = bn_param.get('eps', 1e-5)
+    momentum = bn_param.get('momentum', 0.9)
+
+    # For some reason, need to add this shit
+    gamma = gamma[None,:,None,None]
+    beta = beta[None,:,None,None]
+    
+    running_mean = bn_param.get('running_mean', np.zeros(C, dtype=x.dtype))
+    running_var = bn_param.get('running_var', np.zeros(C, dtype=x.dtype))
+
+
+    if mode == 'train':
+        # One can do mean accross multiple dimensions -.-
+        # I was reshaping and doing weird stuff all the time
+        # 1 is the C dim
+        mean = x.mean(axis=(0,2,3))
+        x_zero_mean = x - mean[None,:,None,None]
+        
+        var = x.var(axis=(0,2,3))
+        var_sqrt = np.sqrt(var[None,:,None,None] + eps)
+        var_inv = 1 / var_sqrt
+        x_norm = x_zero_mean * var_inv
+
+        running_mean = momentum * running_mean + (1 - momentum) * mean
+        running_var = momentum * running_var + (1 - momentum) * var
+        
+        out = gamma * x_norm + beta
+        cache = {
+            'x': x,
+            'mean': mean,
+            'x_zero_mean': x_zero_mean,
+            'var': var,
+            'var_sqrt': var_sqrt,
+            'var_inv': var_inv,
+            'x_norm': x_norm,
+            'beta': beta,
+            'gamma': gamma,
+            'eps': eps
+        }
+        
+    elif mode == 'test':
+        running_mean_add = running_mean[None,:,None,None]
+        running_var_add = running_var[None,:,None,None]
+        x_norm = (x - running_mean_add) / np.sqrt(running_var_add + eps)
+        out = gamma * x_norm + beta
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
+    else:
+        raise ValueError('Invalid forward batchnorm mode "%s"' % mode)
 
+    # Store the updated running means back into bn_param
+    bn_param['running_mean'] = running_mean
+    bn_param['running_var'] = running_var
+    
     return out, cache
 
 
@@ -721,7 +774,48 @@ def spatial_batchnorm_backward(dout, cache):
     # version of batch normalization defined above. Your implementation should#
     # be very short; ours is less than five lines.                            #
     ###########################################################################
-    pass
+
+    beta = cache['beta']
+    gamma = cache['gamma']
+
+    x = cache['x']
+    mean = cache['mean'][None,:,None,None]
+    x_zero_mean = cache['x_zero_mean']
+    var = cache['var'][None,:,None,None]
+    var_sqrt = cache['var_sqrt'][None,:,None,None]
+    var_inv = cache['var_inv'][None,:,None,None]
+    x_norm = cache['x_norm']
+    eps = cache['eps']
+
+    N = x.shape[0]
+
+    
+    dx_norm = gamma * dout
+    
+    dx_zero_mean1 = var_inv * dx_norm
+    
+    # Dunno why, similar to b
+    # It's because there is a substraction accross features (columns)
+    # one does not see it coz of broadcasting
+    dvar_inv = np.sum(x_zero_mean * dx_norm, axis=0)
+    dvar_sqrt = -1 / (var_sqrt ** 2 + eps) * dvar_inv
+    dvar = 0.5 / np.sqrt(var + eps) * dvar_sqrt
+    
+    dx_zero_mean2 = (2 * x_zero_mean) * np.ones_like(x) * (1/N) * dvar
+
+    
+    dx_zero_mean = dx_zero_mean1 + dx_zero_mean2
+
+
+    # This is a summation node
+    dx1 = dx_zero_mean
+    dmean = - np.sum(dx_zero_mean, axis = 0)
+    dx2 = 1/N * np.ones_like(x) * dmean
+
+    dx = dx1 + dx2
+    dgamma = np.sum(x_norm * dout, axis=0)
+    dbeta = np.sum(dout, axis=0)
+    
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
