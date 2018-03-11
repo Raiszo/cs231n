@@ -584,11 +584,35 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     # TODO: Implement the max pooling forward pass                            #
     ###########################################################################
-    pass
+    ph		= pool_param['pool_height']
+    pw		= pool_param['pool_width']
+    stride	= pool_param['stride']
+    N,C,H,W	= x.shape
+
+
+    out_shape = N, C, H//stride, W//stride
+    out = np.zeros(out_shape)
+    ind = np.zeros(out_shape)
+    half_h = ph//2 - (1 if ph%2 == 0 else 0)
+    half_w = pw//2 - (1 if pw%2 == 0 else 0)
+
+    for m in range(N):
+        img = x[m]
+
+        for i in range(out.shape[2]):
+            for j in range(out.shape[3]):
+                current_h = (i*stride) if i>0 else 0
+                current_w = (j*stride) if j>0 else 0
+                mask = img[:, current_h:current_h+stride, current_w:current_w+stride]
+
+                # reshape trick to get the max value easily
+                maxis = mask.reshape(mask.shape[0], np.prod(mask.shape[1:]))
+                out[m,:,i,j] = np.amax(maxis, axis=1)
+                ind[m,:,i,j] = np.argmax(maxis, axis=1)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
-    cache = (x, pool_param)
+    cache = (x, pool_param, ind)
     return out, cache
 
 
@@ -607,7 +631,29 @@ def max_pool_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the max pooling backward pass                           #
     ###########################################################################
-    pass
+    x, pool_param, max_indexes = cache
+
+    ph		= pool_param['pool_height']
+    pw		= pool_param['pool_width']
+    stride	= pool_param['stride']
+    N,C,H,W	= x.shape
+
+
+    dx = np.zeros_like(x)
+    half_h = ph//2 - (1 if ph%2 == 0 else 0)
+    half_w = pw//2 - (1 if pw%2 == 0 else 0)
+
+    for m in range(N):
+        for i in range(dout.shape[2]):
+            for j in range(dout.shape[3]):
+                # for each pooling result, get the position of the max value
+                mask_row = np.zeros((C,ph*pw))
+                mask_row[np.arange(C),max_indexes[m,:,i,j].astype(int)] = dout[m,np.arange(C),i,j]
+                mask = mask_row.reshape(C,ph,pw)
+                
+                # Then add the gradient to the result (dx)
+                dx[m,:,i*stride:(i+1)*stride,j*stride:(j+1)*stride] += mask
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
