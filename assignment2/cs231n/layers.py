@@ -698,8 +698,8 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     momentum = bn_param.get('momentum', 0.9)
 
     # For some reason, need to add this shit
-    gamma = gamma[None,:,None,None]
-    beta = beta[None,:,None,None]
+    gamma_b = gamma[None,:,None,None]
+    beta_b = beta[None,:,None,None]
     
     running_mean = bn_param.get('running_mean', np.zeros(C, dtype=x.dtype))
     running_var = bn_param.get('running_var', np.zeros(C, dtype=x.dtype))
@@ -709,18 +709,20 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
         # One can do mean accross multiple dimensions -.-
         # I was reshaping and doing weird stuff all the time
         # 1 is the C dim
-        mean = x.mean(axis=(0,2,3))
-        x_zero_mean = x - mean[None,:,None,None]
+        mean = x.mean(axis=(0,2,3)) # shape (C,)
+        x_zero_mean = x - mean[None,:,None,None] # Need to broadcast it manually
         
-        var = x.var(axis=(0,2,3))
-        var_sqrt = np.sqrt(var[None,:,None,None] + eps)
+        var = x.var(axis=(0,2,3)) # shape (C,)
+        var_sqrt = np.sqrt(var[None,:,None,None] + eps) # Need to broadcast it manually
         var_inv = 1 / var_sqrt
         x_norm = x_zero_mean * var_inv
 
+        # running_mean and var keep the (C,) dimension
         running_mean = momentum * running_mean + (1 - momentum) * mean
         running_var = momentum * running_var + (1 - momentum) * var
-        
-        out = gamma * x_norm + beta
+
+        # Above is the manual broadcasting
+        out = gamma_b * x_norm + beta_b
         cache = {
             'x': x,
             'mean': mean,
@@ -738,7 +740,7 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
         running_mean_add = running_mean[None,:,None,None]
         running_var_add = running_var[None,:,None,None]
         x_norm = (x - running_mean_add) / np.sqrt(running_var_add + eps)
-        out = gamma * x_norm + beta
+        out = gamma_b * x_norm + beta_b
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -775,33 +777,36 @@ def spatial_batchnorm_backward(dout, cache):
     # be very short; ours is less than five lines.                            #
     ###########################################################################
 
-    beta = cache['beta']
-    gamma = cache['gamma']
+    beta = cache['beta'][None,:,None,None]
+    gamma = cache['gamma'][None,:,None,None]
 
     x = cache['x']
     mean = cache['mean'][None,:,None,None]
     x_zero_mean = cache['x_zero_mean']
     var = cache['var'][None,:,None,None]
-    var_sqrt = cache['var_sqrt'][None,:,None,None]
-    var_inv = cache['var_inv'][None,:,None,None]
+    var_sqrt = cache['var_sqrt']
+    var_inv = cache['var_inv']
     x_norm = cache['x_norm']
     eps = cache['eps']
 
-    N = x.shape[0]
+    N,C,H,W = x.shape
 
-    
+    # print(dout.shape)
+    # print(gamma.shape)
     dx_norm = gamma * dout
+    # print(dx_norm.shape)
     
     dx_zero_mean1 = var_inv * dx_norm
-    
-    # Dunno why, similar to b
-    # It's because there is a substraction accross features (columns)
-    # one does not see it coz of broadcasting
-    dvar_inv = np.sum(x_zero_mean * dx_norm, axis=0)
+
+    dvar_inv = np.sum(x_zero_mean * dx_norm, axis=(0,2,3), keepdims=True)
+    # print(dvar_inv.shape)
+    # print(var_sqrt.shape)
     dvar_sqrt = -1 / (var_sqrt ** 2 + eps) * dvar_inv
+    # print(dvar_sqrt.shape)
     dvar = 0.5 / np.sqrt(var + eps) * dvar_sqrt
+    # print(var.shape)
     
-    dx_zero_mean2 = (2 * x_zero_mean) * np.ones_like(x) * (1/N) * dvar
+    dx_zero_mean2 = (2 * x_zero_mean) * np.ones_like(x) * (1/(N*H*W)) * dvar
 
     
     dx_zero_mean = dx_zero_mean1 + dx_zero_mean2
@@ -809,12 +814,12 @@ def spatial_batchnorm_backward(dout, cache):
 
     # This is a summation node
     dx1 = dx_zero_mean
-    dmean = - np.sum(dx_zero_mean, axis = 0)
-    dx2 = 1/N * np.ones_like(x) * dmean
+    dmean = - np.sum(dx_zero_mean, axis = (0,2,3), keepdims=True)
+    dx2 = 1/(N*H*W) * np.ones_like(x) * dmean
 
     dx = dx1 + dx2
-    dgamma = np.sum(x_norm * dout, axis=0)
-    dbeta = np.sum(dout, axis=0)
+    dgamma = np.sum(x_norm * dout, axis=(0,2,3))
+    dbeta = np.sum(dout, axis=(0,2,3))
     
     ###########################################################################
     #                             END OF YOUR CODE                            #
