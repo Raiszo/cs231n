@@ -476,11 +476,13 @@ def conv_forward_naive(x, w, b, conv_param):
         for i in range(out_h):
             for j in range(out_w):
                 # start at zero, and move with stride
+                # assuming stride = pad, bad D:x 
                 current_h = (i*stride) if i>0 else 0
                 current_w = (j*stride) if j>0 else 0
                 # Once in a position, get a small window from the image
                 mask = padded[:,current_h:current_h+hh, current_w:current_w+ww]
 
+                # neat bradcasting :3
                 prod = mask * w
                 # Use this to sum elements across all dims, except for 0 (f)
                 conv = prod.reshape(prod.shape[0], np.prod(prod.shape[1:])).sum(axis=1)
@@ -550,6 +552,7 @@ def conv_backward_naive(dout, cache):
                 dout_conv = dout_conv_row.reshape(f,C,hh,ww)
 
                 # Once dout is projected, update dw
+                # Neat broadcasting :3
                 dw += mask*dout_conv
 
                 dx_space = (w*dout_conv).sum(axis=0)
