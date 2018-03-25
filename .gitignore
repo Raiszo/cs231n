@@ -1,3 +1,12 @@
+# pre trained model
+imagenet_val_25.npz
+squeezenet.ckpt.data-00000-of-00001
+squeezenet.ckpt.index
+squeezenet.ckpt.meta
+
+# coco_dataset
+coco_captioning/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
