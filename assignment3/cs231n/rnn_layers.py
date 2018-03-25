@@ -34,7 +34,19 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # hidden state and any values you need for the backward pass in the next_h   #
     # and cache variables respectively.                                          #
     ##############################################################################
-    pass
+
+    D = x.shape[1]
+    # Remember to stack them accross the correct dimension
+    # (N,D+H)
+    x_h = np.concatenate((x,prev_h), axis=1)
+    # (D+H,H)
+    w = np.concatenate((Wx,Wh), axis=0)
+
+    def tanh(x):
+        return np.tanh(x)
+    
+    next_h = tanh(x_h.dot(w) + b)
+    cache = D, w, x_h, next_h
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -63,7 +75,23 @@ def rnn_step_backward(dnext_h, cache):
     # HINT: For the tanh function, you can compute the local derivative in terms #
     # of the output value from tanh.                                             #
     ##############################################################################
-    pass
+    D, w, x_h, next_h = cache
+
+    # N x H
+    dout = (1 - next_h ** 2) * dnext_h
+
+    # (N,H) . (D+H,H).T = (N,D+H)
+    dx_concat = dout.dot(w.T)
+    # (N,D+H).T . (N,H)= (D+H,H)
+    dw_concat = x_h.T.dot(dout)
+
+    dx = dx_concat[:,0:D]
+    dprev_h = dx_concat[:,D:]
+
+    dWx = dw_concat[0:D,:]
+    dWh = dw_concat[D:,:]
+    
+    db = np.sum(dout, axis=0)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -94,7 +122,18 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # input data. You should use the rnn_step_forward function that you defined  #
     # above. You can use a for loop to help compute the forward pass.            #
     ##############################################################################
-    pass
+    N, T, D = x.shape
+    _, H = h0.shape
+    h = np.zeros((N, T, H))
+    cache_steps = list()
+    
+    for i in range(T):
+        x_step = x[:,i,:]
+        h0, cache_step = rnn_step_forward(x_step, h0, Wx, Wh, b)
+        h[:,i,:] = h0
+        cache_steps.append(cache_step)
+
+    cache = cache_steps, x, h0
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -121,7 +160,32 @@ def rnn_backward(dh, cache):
     # sequence of data. You should use the rnn_step_backward function that you   #
     # defined above. You can use a for loop to help compute the backward pass.   #
     ##############################################################################
-    pass
+    cache_list, x , h0= cache
+    
+    N, T, D = x.shape
+    _, H = h0.shape
+
+    dx = np.zeros((N, T, D))
+    dh0 = np.zeros((N, H))
+    dWx = np.zeros((D,H))
+    dWh = np.zeros((H,H))
+    db = np.zeros(H)
+    # need to reverse coz it is backward in time too :D
+    for i in reversed(range(T)):
+        # reverse it in time, if it's the final step,
+        # only consider the upstream flow of dh
+        # Otherwise consider the flow between steps
+        dh_step = dh[:,i,:] if i == T else dh[:,i,:] + dh0
+        dx_step, dh0, dWx_step, dWh_step, db_step = rnn_step_backward(dh_step, cache_list[i])
+        dx[:,i,:] = dx_step
+        
+        dWx += dWx_step
+        dWh += dWh_step
+        db += db_step
+
+    # gradient of dh0 is the last dh of the backward pass, so, it is the first
+    # one in the time flow
+
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
