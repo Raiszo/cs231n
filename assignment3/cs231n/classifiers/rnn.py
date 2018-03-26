@@ -137,7 +137,31 @@ class CaptioningRNN(object):
         # defined above to store loss and gradients; grads[k] should give the      #
         # gradients for self.params[k].                                            #
         ############################################################################
-        pass
+        prev_h = features.dot(W_proj) + b_proj
+
+        x, cache_embed = word_embedding_forward(captions_in, W_embed)
+        next_h, cache_rnn = rnn_forward(x, prev_h, Wx, Wh, b)
+        scores, cache_aff = temporal_affine_forward(next_h, W_vocab, b_vocab)
+
+        loss, dscores = temporal_softmax_loss(scores, captions_out, mask, False)
+
+        dnext_h, dW_vocab, db_vocab = temporal_affine_backward(dscores, cache_aff)
+        dx, dprev_h, dWx, dWh, db = rnn_backward(dnext_h, cache_rnn)
+        dW_embed = word_embedding_backward(dx, cache_embed)
+
+        dW_proj = dprev_h.T.dot(features).T
+        db_proj = dprev_h.sum(axis=0)
+
+        grads = {
+            'W_proj'	: dW_proj,
+            'b_proj'	: db_proj,
+            'W_embed'	: dW_embed,
+            'Wx'	: dWx,
+            'Wh'	: dWh,
+            'b'		: db,
+            'W_vocab'	: dW_vocab,
+            'b_vocab'	: db_vocab
+        }        
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -199,7 +223,23 @@ class CaptioningRNN(object):
         # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
         # a loop.                                                                 #
         ###########################################################################
-        pass
+        N = features.shape[0]
+        
+        h = features.dot(W_proj) + b_proj
+        word = np.ones(N) * self._start
+        word = word.astype(int)
+
+        captions = np.zeros((N,max_length))
+        for i in range(max_length):
+            print(word)
+            x, _ = word_embedding_forward(word, W_embed)
+            print(x.shape)
+            print(h.shape)
+            h, _ = rnn_step_forward(x, h, Wx, Wh, b)
+            scores = temporal_affine_forward(h, W_vocab, b_vocab)
+
+            word = amax(scores, axis=1, keepdims=True)
+            captions[:,i] = self.idx_to_word(word)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################

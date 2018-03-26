@@ -215,6 +215,7 @@ def word_embedding_forward(x, W):
     ##############################################################################
     # dunno what I did here :v
     out = W[x]
+    cache = x, W
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -243,7 +244,11 @@ def word_embedding_backward(dout, cache):
     # Note that Words can appear more than once in a sequence.                   #
     # HINT: Look up the function np.add.at                                       #
     ##############################################################################
+    x, W = cache
+
+    dW = np.zeros_like(W)
     
+    np.add.at(dW, x, dout)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -410,6 +415,8 @@ def temporal_affine_forward(x, w, b):
     """
     N, T, D = x.shape
     M = b.shape[0]
+    # Raizo: for each example in the minibatch and each timestep
+    # compute the affine layer
     out = x.reshape(N * T, D).dot(w).reshape(N, T, M) + b
     cache = x, w, b, out
     return out, cache
