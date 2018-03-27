@@ -229,17 +229,19 @@ class CaptioningRNN(object):
         word = np.ones(N) * self._start
         word = word.astype(int)
 
-        captions = np.zeros((N,max_length))
         for i in range(max_length):
-            print(word)
+            # print(word)
             x, _ = word_embedding_forward(word, W_embed)
-            print(x.shape)
-            print(h.shape)
+            # print(x.shape)
+            # print(h.shape)
             h, _ = rnn_step_forward(x, h, Wx, Wh, b)
-            scores = temporal_affine_forward(h, W_vocab, b_vocab)
+            scores = h.dot(W_vocab) + b_vocab
+            # scores = temporal_affine_forward(h, W_vocab, b_vocab)
 
-            word = amax(scores, axis=1, keepdims=True)
-            captions[:,i] = self.idx_to_word(word)
+            word = np.argmax(scores, axis=1)
+            print(word)
+            captions[:,i] = self.idx_to_word[word]
+            # captions[:,i] = self.idx_to_word[word]
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
