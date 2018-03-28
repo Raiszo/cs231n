@@ -228,20 +228,20 @@ class CaptioningRNN(object):
         h = features.dot(W_proj) + b_proj
         word = np.ones(N) * self._start
         word = word.astype(int)
-
+        # this starts as an array of <START> tokens
+        
         for i in range(max_length):
-            # print(word)
             x, _ = word_embedding_forward(word, W_embed)
-            # print(x.shape)
-            # print(h.shape)
             h, _ = rnn_step_forward(x, h, Wx, Wh, b)
+            # need to do the computation manually, do not use the temporal affine layer
+            # it expects a time series of steps, here it is step by step
             scores = h.dot(W_vocab) + b_vocab
-            # scores = temporal_affine_forward(h, W_vocab, b_vocab)
 
+            # Sample from distribution, and use it for the next step
             word = np.argmax(scores, axis=1)
-            print(word)
-            captions[:,i] = self.idx_to_word[word]
-            # captions[:,i] = self.idx_to_word[word]
+            # Store it in the captions array, just return the indexes of the words
+            # do not try to decode back to real words :u
+            captions[:,i] = word
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
