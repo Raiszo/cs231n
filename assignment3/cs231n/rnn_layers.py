@@ -269,6 +269,9 @@ def sigmoid(x):
     return top / (1 + z)
 
 
+def tanh(x):
+    return np.tanh(x)
+
 def lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b):
     """
     Forward pass for a single timestep of an LSTM.
@@ -294,7 +297,29 @@ def lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b):
     # TODO: Implement the forward pass for a single timestep of an LSTM.        #
     # You may want to use the numerically stable sigmoid implementation above.  #
     #############################################################################
-    pass
+    D = x.shape[1]
+    H = prev_h.shape[1]
+
+    # (N,D+H)
+    x_h = np.concatenate((x,prev_h), axis=1)
+    # (D+H,4H))
+    w = np.concatenate((Wx,Wh), axis=0)
+    
+    scores = x_h.dot(w) + b
+
+    # each of them (N,H)
+    update_gate	= sigmoid(scores[:,0:H])
+    forget_gate = sigmoid(scores[:,H:2*H])
+    output_gate = sigmoid(scores[:,2*H:3*H])
+    gate_gate	= tanh(scores[:,3*H:])
+
+    # just for cache
+    gates = update_gate, forget_gate, output_gate, gate_gate
+    
+    next_c = update_gate * gate_gate + forget_gate * prev_c
+    next_h = output_gate * tanh(next_c)
+
+    cache = w, x_h, prev_c, next_h, next_c, gates, D, H
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -326,7 +351,41 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     # HINT: For sigmoid and tanh you can compute local derivatives in terms of  #
     # the output value from the nonlinearity.                                   #
     #############################################################################
-    pass
+    w, x_h, prev_c, next_h, next_c, gates, D, H = cache
+    update_gate, forget_gate, output_gate, gate_gate = gates
+    x = x_h[:,0:D]
+    prev_h = x_h[:,D:]
+    
+    # handle dnext_h (N,H)
+    doutput_gate = tanH(next_c) * dnext_h
+    dtanh_next_c = output_gate * dnext_h
+
+    # add the gradient flow from the output_gate
+    dnext_c += (1 - next_c ** 2) * dtanh_next_c
+
+    
+    # C: memory cell backward (N,H)
+    dupdate_gate = gate_gate * dnext_c
+    dforget_gate = prev_c * dnext_c
+    doutput_gate = (1 - tanh(next_c) ** 2) * output_gate * dnext_h
+    dgate_gate = udpate_gate * dnext_c
+
+    dprev_c = forget_gate * dnext_c
+
+    def sigmoid_back(x):
+        return sigmid(x) * (1 - sigmoid(x))
+    def tanh_back(x):
+        return (1 - x ** 2)
+
+    to_concat = list()
+    to_concat.append(sigmoid_back(update_gate) * dupdate_gate)
+    to_concat.append(sigmoid_back(forget_gate) * dforget_gate)
+    to_concat.append(sigmoid_back(output_gate) * doutput_gate)
+    to_concat.append(tanh_back(gate_gate) * dgate_gate)
+    
+    dscores = np.concatenate(to_concat, axis=1)
+    
+    
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -361,7 +420,7 @@ def lstm_forward(x, h0, Wx, Wh, b):
     # TODO: Implement the forward pass for an LSTM over an entire timeseries.   #
     # You should use the lstm_step_forward function that you just defined.      #
     #############################################################################
-    pass
+    pass 
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
