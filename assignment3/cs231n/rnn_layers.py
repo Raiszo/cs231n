@@ -304,7 +304,8 @@ def lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b):
     x_h = np.concatenate((x,prev_h), axis=1)
     # (D+H,4H))
     w = np.concatenate((Wx,Wh), axis=0)
-    
+
+    # (N,4H)
     scores = x_h.dot(w) + b
 
     # each of them (N,H)
@@ -355,25 +356,25 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     update_gate, forget_gate, output_gate, gate_gate = gates
     x = x_h[:,0:D]
     prev_h = x_h[:,D:]
-    
+
     # handle dnext_h (N,H)
-    doutput_gate = tanH(next_c) * dnext_h
+    doutput_gate = tanh(next_c) * dnext_h
     dtanh_next_c = output_gate * dnext_h
 
     # add the gradient flow from the output_gate
-    dnext_c += (1 - next_c ** 2) * dtanh_next_c
+    dnext_c += (1 - tanh(next_c) ** 2) * dtanh_next_c
 
     
     # C: memory cell backward (N,H)
     dupdate_gate = gate_gate * dnext_c
     dforget_gate = prev_c * dnext_c
     doutput_gate = (1 - tanh(next_c) ** 2) * output_gate * dnext_h
-    dgate_gate = udpate_gate * dnext_c
+    dgate_gate = update_gate * dnext_c
 
     dprev_c = forget_gate * dnext_c
 
     def sigmoid_back(x):
-        return sigmid(x) * (1 - sigmoid(x))
+        return sigmoid(x) * (1 - sigmoid(x))
     def tanh_back(x):
         return (1 - x ** 2)
 
@@ -384,7 +385,14 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     to_concat.append(tanh_back(gate_gate) * dgate_gate)
     
     dscores = np.concatenate(to_concat, axis=1)
-    
+    dx_h = w.dot(dscores.T).T
+    dw = x_h.T.dot(dscores)
+    db = dscores.sum(axis=0)
+
+    dx = dx_h[:,0:D],
+    dprev_h = dx_h[:,D:]
+    dWx = dw[0:D,:]
+    dWh = dw[D:,:]
     
     ##############################################################################
     #                               END OF YOUR CODE                             #
