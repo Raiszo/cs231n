@@ -391,11 +391,11 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     dw = x_h.T.dot(dscores)
     db = dscores.sum(axis=0)
 
-    dx = dx_h[:,0:D],
+    dx = dx_h[:,0:D]
     dprev_h = dx_h[:,D:]
     dWx = dw[0:D,:]
     dWh = dw[D:,:]
-    
+
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -430,7 +430,21 @@ def lstm_forward(x, h0, Wx, Wh, b):
     # TODO: Implement the forward pass for an LSTM over an entire timeseries.   #
     # You should use the lstm_step_forward function that you just defined.      #
     #############################################################################
-    pass 
+    N, T, D = x.shape
+    _, H = h0.shape
+    
+    h,c = np.zeros((N, T, H)), np.zeros((N, T, H))
+    cache_steps = list()
+
+    c0 = np.zeros((N, H))
+    
+    for i in range(T):
+        x_step = x[:,i,:]
+        h0, c0, cache_step = lstm_step_forward(x_step, h0, c0, Wx, Wh, b)
+        h[:,i,:] = h0
+        cache_steps.append(cache_step)
+
+    cache = cache_steps, x, h0, c0
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -458,7 +472,36 @@ def lstm_backward(dh, cache):
     # TODO: Implement the backward pass for an LSTM over an entire timeseries.  #
     # You should use the lstm_step_backward function that you just defined.     #
     #############################################################################
-    pass
+    cache_list, x , h0, c0 = cache
+    
+    N, T, D = x.shape
+    _, H = h0.shape
+
+    dx = np.zeros((N, T, D))
+    dh0 = np.zeros((N, H))
+    dc0 = np.zeros((N, H))
+    dWx = np.zeros((D,4*H))
+    dWh = np.zeros((H,4*H))
+    db = np.zeros(4*H)
+    
+    # need to reverse coz it is backward in time too :D
+    for i in reversed(range(T)):
+        # reverse it in time, if it's the final step,
+        # only consider the upstream flow of dh
+        # Otherwise consider the flow between steps
+        dh_step = dh[:,i,:] + (0 if i == T else dh0)
+        dc_step = dc0
+        
+        dx_step, dh0, dc0, dWx_step, dWh_step, db_step = lstm_step_backward(dh_step, dc_step, cache_list[i])
+        dx[:,i,:] = dx_step
+        
+        dWx += dWx_step
+        dWh += dWh_step
+        db += db_step
+
+    # gradient of dh0 is the last dh of the backward pass, so, it is the first
+    # one in the time flow
+
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################

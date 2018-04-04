@@ -140,13 +140,24 @@ class CaptioningRNN(object):
         prev_h = features.dot(W_proj) + b_proj
 
         x, cache_embed = word_embedding_forward(captions_in, W_embed)
-        next_h, cache_rnn = rnn_forward(x, prev_h, Wx, Wh, b)
+
+        # Dictionaries as switch case :3, JS <3
+        forward_func = {
+            'rnn': rnn_forward,
+            'lstm': lstm_forward
+        }
+        backward_func = {
+            'rnn': rnn_backward,
+            'lstm': lstm_backward
+        }
+        
+        next_h, cache_rnn = forward_func[self.cell_type](x, prev_h, Wx, Wh, b)            
         scores, cache_aff = temporal_affine_forward(next_h, W_vocab, b_vocab)
 
         loss, dscores = temporal_softmax_loss(scores, captions_out, mask, False)
 
         dnext_h, dW_vocab, db_vocab = temporal_affine_backward(dscores, cache_aff)
-        dx, dprev_h, dWx, dWh, db = rnn_backward(dnext_h, cache_rnn)
+        dx, dprev_h, dWx, dWh, db = backward_func[self.cell_type](dnext_h, cache_rnn)
         dW_embed = word_embedding_backward(dx, cache_embed)
 
         dW_proj = dprev_h.T.dot(features).T
@@ -226,13 +237,18 @@ class CaptioningRNN(object):
         N = features.shape[0]
         
         h = features.dot(W_proj) + b_proj
+        if (self.cell_type == 'lstm'): c = np.zeros_like(h)
+        
         word = np.ones(N) * self._start
         word = word.astype(int)
         # this starts as an array of <START> tokens
         
         for i in range(max_length):
             x, _ = word_embedding_forward(word, W_embed)
-            h, _ = rnn_step_forward(x, h, Wx, Wh, b)
+            if (self.cell_type == 'rnn'):
+                h, _ = rnn_step_forward(x, h, Wx, Wh, b)
+            else:
+                h, c, _ = lstm_step_forward(x, h, c, Wx, Wh, b)
             # need to do the computation manually, do not use the temporal affine layer
             # it expects a time series of steps, here it is step by step
             scores = h.dot(W_vocab) + b_vocab
