@@ -314,13 +314,15 @@ def lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b):
     output_gate = sigmoid(scores[:,2*H:3*H])
     gate_gate	= tanh(scores[:,3*H:])
 
-    # just for cache
-    gates = update_gate, forget_gate, output_gate, gate_gate
     
     next_c = update_gate * gate_gate + forget_gate * prev_c
-    next_h = output_gate * tanh(next_c)
+    # At first, better to write all operations to backpropagate easily
+    tanh_next_c = tanh(next_c)
+    next_h = output_gate * tanh_next_c
 
-    cache = w, x_h, prev_c, next_h, next_c, gates, D, H
+    # just for cache
+    gates = update_gate, forget_gate, output_gate, gate_gate
+    cache = w, x_h, prev_c, next_h, next_c, tanh_next_c, gates, D, H
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -352,31 +354,31 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     # HINT: For sigmoid and tanh you can compute local derivatives in terms of  #
     # the output value from the nonlinearity.                                   #
     #############################################################################
-    w, x_h, prev_c, next_h, next_c, gates, D, H = cache
+    w, x_h, prev_c, next_h, next_c, tanh_next_c, gates, D, H = cache
     update_gate, forget_gate, output_gate, gate_gate = gates
     x = x_h[:,0:D]
     prev_h = x_h[:,D:]
+
+    def sigmoid_back(x):
+        return x * (1 - x)
+    def tanh_back(x):
+        return (1 - x ** 2)
 
     # handle dnext_h (N,H)
     doutput_gate = tanh(next_c) * dnext_h
     dtanh_next_c = output_gate * dnext_h
 
     # add the gradient flow from the output_gate
-    dnext_c += (1 - tanh(next_c) ** 2) * dtanh_next_c
-
+    dnext_c += tanh_back(tanh_next_c) * dtanh_next_c
     
     # C: memory cell backward (N,H)
     dupdate_gate = gate_gate * dnext_c
     dforget_gate = prev_c * dnext_c
-    doutput_gate = (1 - tanh(next_c) ** 2) * output_gate * dnext_h
+    doutput_gate = tanh_next_c * dnext_h
     dgate_gate = update_gate * dnext_c
 
     dprev_c = forget_gate * dnext_c
 
-    def sigmoid_back(x):
-        return sigmoid(x) * (1 - sigmoid(x))
-    def tanh_back(x):
-        return (1 - x ** 2)
 
     to_concat = list()
     to_concat.append(sigmoid_back(update_gate) * dupdate_gate)
